@@ -90,6 +90,7 @@ resource "aws_instance" "node" {
   subnet_id              = aws_subnet.lab.id
   vpc_security_group_ids = [aws_security_group.ssh.id]
   key_name               = aws_key_pair.lab.key_name
+  user_data              = file("user_data.sh")
 
   tags = { Name = "sre-lab-node-1" }
 }
