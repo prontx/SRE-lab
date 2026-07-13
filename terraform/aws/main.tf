@@ -1,3 +1,7 @@
+variable "my_ip" {
+  type = string
+}
+
 terraform {
   required_providers {
     aws = {
@@ -29,7 +33,14 @@ resource "aws_security_group" "ssh" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["147.229.117.40/32"]  
+    cidr_blocks = [var.my_ip]  
+  }
+
+  ingress {
+    from_port   = 6443
+    to_port     = 6443
+    protocol    = "tcp"
+    cidr_blocks = [var.my_ip]  
   }
   egress {
     from_port   = 0
@@ -86,7 +97,7 @@ data "aws_ami" "ubuntu" {
 
 resource "aws_instance" "node" {
   ami                    = data.aws_ami.ubuntu.id
-  instance_type          = "t3.micro"
+  instance_type          = "t3.small"
   subnet_id              = aws_subnet.lab.id
   vpc_security_group_ids = [aws_security_group.ssh.id]
   key_name               = aws_key_pair.lab.key_name
