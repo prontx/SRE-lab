@@ -1,0 +1,6 @@
+alertmanager:
+  enabled: false      # nothing to alert, nobody to page
+
+prometheus:
+  prometheusSpec:
+    retention: 6h    

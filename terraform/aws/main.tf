@@ -97,7 +97,7 @@ data "aws_ami" "ubuntu" {
 
 resource "aws_instance" "node" {
   ami                    = data.aws_ami.ubuntu.id
-  instance_type          = "t3.small"
+  instance_type          = "m7i-flex.large"
   subnet_id              = aws_subnet.lab.id
   vpc_security_group_ids = [aws_security_group.ssh.id]
   key_name               = aws_key_pair.lab.key_name
