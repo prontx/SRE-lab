@@ -15,19 +15,22 @@ built from scratch, provisioned as code, and destroyed after each session.
   (no hardcoded, region-rotting AMI IDs)
 - Security groups parameterized by source IP (`-var my_ip=...`)
 - k3s single-node Kubernetes bootstrapped at boot via cloud-init `user_data`,
-  with the public IP injected into the API cert SANs via IMDSv2 at boot
+  with the public IP injected into the API cert SANs via IMDSv2 at boot,
+  and kubelet pinned to the VPC resolver (see DNS incident below)
 - State hygiene: tfstate excluded from VCS, provider versions pinned via lock file
 
 ### `scripts/` — session automation ✅
 - `session-up.sh`: apply -> wait for SSH -> wait for cloud-init -> pull kubeconfig -> ready
-- `session-down.sh`: destroy → verify no instances/volumes/EIPs left behind
+- `session-down.sh`: destroy -> verify no instances/volumes/EIPs left behind
 
 ### `k8s/` — Kubernetes ops
 - Remote kubectl access (TLS SAN problem — see below) ✅
-- Helm-deployed observability: kube-prometheus-stack (Prometheus, Grafana,
-  node-exporter, kube-state-metrics) with values override ✅
+- Observability: kube-prometheus-stack (Prometheus, Grafana, node-exporter,
+  kube-state-metrics) with values override ✅
+- GitOps: Flux bootstrapped against this repo, monitoring stack deployed as a
+  HelmRelease — cluster config converges from `k8s/clusters/lab/` on every
+  push; manual kubectl changes are drift and get reverted ✅
 - Loki for logs — planned
-- GitOps with Flux/ArgoCD — planned
 - CI/CD via GitHub Actions — planned
 
 ## Incidents & lessons so far
@@ -41,6 +44,14 @@ Real problems hit and diagnosed along the way:
 - **Same signature, round two**: deploying kube-prometheus-stack starved the
   2GB node the same way — recognized it on sight this time. Empirical sizing
   rule derived: bare k3s needs 2GB, k3s + a real workload needs 4GB+.
+- **Cluster-wide DNS SERVFAIL** -> Flux couldn't clone, `nslookup` from a pod
+  returned SERVFAIL from CoreDNS. Root cause: CoreDNS inherited the host's
+  `/etc/resolv.conf` pointing at systemd-resolved's loopback stub
+  (127.0.0.53) — unreachable from inside a pod's network namespace, since
+  every netns has its own loopback. Hotfixed by forwarding CoreDNS to the AWS
+  VPC resolver (169.254.169.253); fixed permanently by pinning the kubelet to
+  a dedicated resolv.conf in cloud-init. Also a lesson in stale status:
+  the GitRepository kept showing the old error until its next reconcile.
 - **Free-tier constraint discovery**: t3.medium rejected as not free-tier
   eligible. Read the error, ran `describe-instance-types
   --filters free-tier-eligible=true`, found m7i-flex.large (8GB) in the
@@ -49,8 +60,13 @@ Real problems hit and diagnosed along the way:
   cloud-init doesn't rerun but the public IP changes, leaving the boot-time
   TLS cert stale. Anything configured at boot goes stale when runtime identity
   changes. Fix: destroy and recreate.
+- **Flux bootstrap 403 on deploy keys**: fine-grained GitHub token had
+  Contents+Metadata but not Administration — Flux pushed manifests fine, then
+  failed registering its SSH deploy key. Least-privilege tokens fail closed;
+  granting one more verb is the system working.
 - **Drift detection in practice**: manually tagged a VPC in the console,
-  watched `terraform plan` propose reverting it.
+  watched `terraform plan` propose reverting it. Later re-learned it from the
+  other side: deleted the Grafana deployment by hand, watched Flux heal it.
 - **State is the boundary of Terraform's world**: tagged the wrong (default)
   VPC, Terraform didn't blink. Resources outside state are invisible.
 
@@ -72,8 +88,8 @@ The mental model transfer from OpenStack is the point of this repo:
 ## TODO
 - [ ] Least-privilege IAM policy for the terraform user (lab currently uses AdministratorAccess)
 - [ ] Remote state backend (S3 + DynamoDB locking)
+- [ ] flux bootstrap folded into session-up.sh (token via env var)
 - [ ] Loki + log pipeline
-- [ ] GitOps: Flux syncing k8s/ from this repo
 - [ ] GitHub Actions: terraform fmt/validate on PR
 - [ ] Multi-node k3s
 - [ ] Terraform mirror against OpenStack provider
