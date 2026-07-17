@@ -12,7 +12,7 @@ terraform {
 }
 
 provider "aws" {
-  region = "eu-central-1"  
+  region = "eu-central-1"
 }
 
 resource "aws_vpc" "lab" {
@@ -21,9 +21,9 @@ resource "aws_vpc" "lab" {
 }
 
 resource "aws_subnet" "lab" {
-  vpc_id     = aws_vpc.lab.id
-  cidr_block = "10.42.1.0/24"
-  tags       = { Name = "sre-lab-subnet" }
+  vpc_id                  = aws_vpc.lab.id
+  cidr_block              = "10.42.1.0/24"
+  tags                    = { Name = "sre-lab-subnet" }
   map_public_ip_on_launch = true
 }
 
@@ -33,14 +33,14 @@ resource "aws_security_group" "ssh" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = [var.my_ip]  
+    cidr_blocks = [var.my_ip]
   }
 
   ingress {
     from_port   = 6443
     to_port     = 6443
     protocol    = "tcp"
-    cidr_blocks = [var.my_ip]  
+    cidr_blocks = [var.my_ip]
   }
   egress {
     from_port   = 0
@@ -82,7 +82,7 @@ resource "aws_route_table_association" "lab" {
 # Look up the latest Ubuntu 24.04 AMI instead of hardcoding an ID
 data "aws_ami" "ubuntu" {
   most_recent = true
-  owners      = ["099720109477"]   # Canonical's official AWS account
+  owners      = ["099720109477"] # Canonical's official AWS account
 
   filter {
     name   = "name"
