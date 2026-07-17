@@ -60,11 +60,6 @@ resource "aws_security_group" "ssh" {
   }
 }
 
-resource "aws_key_pair" "lab" {
-  key_name   = "sre-lab-key"
-  public_key = file("~/.ssh/sre-lab.pub")
-}
-
 # Internet gateway — the VPC's edge router to the outside world
 resource "aws_internet_gateway" "lab" {
   vpc_id = aws_vpc.lab.id
