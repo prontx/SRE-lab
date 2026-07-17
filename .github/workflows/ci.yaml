@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: fmt check
+        run: terraform -chdir=terraform/aws fmt -check -diff
+
+      - name: init (no backend)
+        run: terraform -chdir=terraform/aws init -backend=false
+
+      - name: validate
+        run: terraform -chdir=terraform/aws validate
+
+  kubernetes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: kubeconform on cluster manifests
+        uses: docker://ghcr.io/yannh/kubeconform:latest
+        with:
+          args: >-
+            -summary -strict
+            -ignore-missing-schemas
+            k8s/clusters/lab/monitoring
