@@ -2,6 +2,11 @@ variable "my_ip" {
   type = string
 }
 
+variable "ssh_public_key" {
+  description = "SSH public key material for the instance"
+  type        = string
+}
+
 terraform {
   required_providers {
     aws = {
@@ -18,6 +23,11 @@ provider "aws" {
 resource "aws_vpc" "lab" {
   cidr_block = "10.42.0.0/16"
   tags       = { Name = "sre-lab-vpc" }
+}
+
+resource "aws_key_pair" "lab" {
+  key_name   = "sre-lab-key"
+  public_key = var.ssh_public_key
 }
 
 resource "aws_subnet" "lab" {
