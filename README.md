@@ -7,36 +7,36 @@ built from scratch, provisioned as code, and destroyed after each session.
 ![Node Exporter dashboard on the lab cluster](docs/grafana-node-exporter.png)
 
 ## Contents
-
+ 
 ### `terraform/aws/` — Infrastructure as Code on AWS ✅
 - VPC, subnet, routing (IGW, route tables) assembled explicitly — the AWS
   equivalent of what Neutron's `router-gateway-set` does implicitly
 - EC2 provisioning with SSH keypair management and AMI lookup via data sources
   (no hardcoded, region-rotting AMI IDs)
-- Security groups parameterized by source IP (`-var my_ip=...`)
+- Fully machine-independent config: source IP and SSH public key supplied as
+  variables — validates on any machine, including CI
 - k3s single-node Kubernetes bootstrapped at boot via cloud-init `user_data`,
   with the public IP injected into the API cert SANs via IMDSv2 at boot,
   and kubelet pinned to the VPC resolver (see DNS incident below)
 - State hygiene: tfstate excluded from VCS, provider versions pinned via lock file
-
 ### `scripts/` — session automation ✅
 - `session-up.sh`: apply -> wait for SSH -> wait for cloud-init -> pull kubeconfig -> ready
 - `session-down.sh`: destroy -> verify no instances/volumes/EIPs left behind
-
-### `k8s/` — Kubernetes ops
-- Remote kubectl access (TLS SAN problem — see below) ✅
+### `k8s/` — Kubernetes ops ✅
+- Remote kubectl access (TLS SAN problem — see below)
 - Observability: kube-prometheus-stack (Prometheus, Grafana, node-exporter,
-  kube-state-metrics) with values override ✅
+  kube-state-metrics) with values override
 - GitOps: Flux bootstrapped against this repo, monitoring stack deployed as a
   HelmRelease — cluster config converges from `k8s/clusters/lab/` on every
-  push; manual kubectl changes are drift and get reverted ✅
-- Loki for logs — planned
-- CI/CD via GitHub Actions — planned
-
+  push; manual kubectl changes are drift and get reverted
+### `.github/workflows/` — CI ✅
+- terraform fmt/validate on every push and PR — no cloud credentials in CI
+  (`init -backend=false`)
+- kubeconform schema validation of all Flux/K8s manifests
 ## Incidents & lessons so far
-
+ 
 Real problems hit and diagnosed along the way:
-
+ 
 - **"TLS handshake timeout" on localhost kubectl** -> not a TLS problem.
   Diagnosed via `free -m` / `dmesg` / `top` as memory starvation: k3s control
   plane on a 1GB t3.micro left 29MB available. Symptoms lie about their layer.
@@ -52,6 +52,12 @@ Real problems hit and diagnosed along the way:
   VPC resolver (169.254.169.253); fixed permanently by pinning the kubelet to
   a dedicated resolv.conf in cloud-init. Also a lesson in stale status:
   the GitRepository kept showing the old error until its next reconcile.
+- **First CI run failed on "working" code** — twice, instructively.
+  `fmt -check` (exit 3) caught five weeks of hand-editing drift; then
+  `validate` caught `file("~/.ssh/...")` — config that only worked on the
+  machine where that file exists. Code that applies cleanly and code that
+  passes a quality gate on a fresh machine are different standards. Fixed by
+  making the key a variable; CI runs with zero cloud credentials.
 - **Free-tier constraint discovery**: t3.medium rejected as not free-tier
   eligible. Read the error, ran `describe-instance-types
   --filters free-tier-eligible=true`, found m7i-flex.large (8GB) in the
@@ -70,10 +76,13 @@ Real problems hit and diagnosed along the way:
 - **State is the boundary of Terraform's world**: tagged the wrong (default)
   VPC, Terraform didn't blink. Resources outside state are invisible.
 
+![Actions successful run](docs/gh-actions.png)
+
+
 ## Background
-
+ 
 The mental model transfer from OpenStack is the point of this repo:
-
+ 
 | OpenStack        | AWS / cloud-native          |
 |------------------|-----------------------------|
 | Neutron network  | VPC                         |
@@ -84,12 +93,12 @@ The mental model transfer from OpenStack is the point of this repo:
 | Glance image     | AMI (per-region!)           |
 | Keystone 403     | IAM deny-by-default         |
 | config-drive / metadata API | IMDSv2           |
-
+ 
 ## TODO
 - [ ] Least-privilege IAM policy for the terraform user (lab currently uses AdministratorAccess)
 - [ ] Remote state backend (S3 + DynamoDB locking)
 - [ ] flux bootstrap folded into session-up.sh (token via env var)
+- [ ] pre-commit hook mirroring the CI checks locally
 - [ ] Loki + log pipeline
-- [ ] GitHub Actions: terraform fmt/validate on PR
 - [ ] Multi-node k3s
 - [ ] Terraform mirror against OpenStack provider
