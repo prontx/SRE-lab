@@ -1,0 +1,4 @@
+[
+  {"name": "grafana", "url": "http://localhost:3000/api/health", "timeout": 3, "failure_threshold": 2},
+  {"name": "prometheus", "url": "http://localhost:9090/-/healthy", "timeout": 3}
+]
