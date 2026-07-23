@@ -1,13 +1,13 @@
 # Cloud-Native lab
 
-Leveraging my 5 years of OpenStack/RHOSP
+Leveraging my 4+ years of OpenStack/RHOSP
 production support engineering experience to cloud-native SRE practice. Everything here is
 built from scratch, provisioned as code, and destroyed after each session.
 
 ![Node Exporter dashboard on the lab cluster](docs/grafana-node-exporter.png)
 
 ## Contents
- 
+
 ### `terraform/aws/` — Infrastructure as Code on AWS ✅
 - VPC, subnet, routing (IGW, route tables) assembled explicitly — the AWS
   equivalent of what Neutron's `router-gateway-set` does implicitly
@@ -19,9 +19,11 @@ built from scratch, provisioned as code, and destroyed after each session.
   with the public IP injected into the API cert SANs via IMDSv2 at boot,
   and kubelet pinned to the VPC resolver (see DNS incident below)
 - State hygiene: tfstate excluded from VCS, provider versions pinned via lock file
+
 ### `scripts/` — session automation ✅
 - `session-up.sh`: apply -> wait for SSH -> wait for cloud-init -> pull kubeconfig -> ready
 - `session-down.sh`: destroy -> verify no instances/volumes/EIPs left behind
+
 ### `k8s/` — Kubernetes ops ✅
 - Remote kubectl access (TLS SAN problem — see below)
 - Observability: kube-prometheus-stack (Prometheus, Grafana, node-exporter,
@@ -29,14 +31,27 @@ built from scratch, provisioned as code, and destroyed after each session.
 - GitOps: Flux bootstrapped against this repo, monitoring stack deployed as a
   HelmRelease — cluster config converges from `k8s/clusters/lab/` on every
   push; manual kubectl changes are drift and get reverted
+
 ### `.github/workflows/` — CI ✅
 - terraform fmt/validate on every push and PR — no cloud credentials in CI
   (`init -backend=false`)
 - kubeconform schema validation of all Flux/K8s manifests
+
+### `python-tools/` — Python beyond snippets ✅
+- `healthpoller/`: polls a set of HTTP endpoints on an interval, tracks
+  consecutive failures per endpoint, reports state transitions
+  (healthy <-> down) — a threshold-based approach to avoid flapping alerts
+  on single blips. Tests mock the HTTP boundary (`responses` library) —
+  no real network calls in CI.
+- `logmetrics/`: parses access-log lines into RED-style metrics
+  (rate, errors, duration incl. p50/p99) per route, emits Prometheus
+  text-exposition format. Parsing/aggregation kept pure (no I/O) —
+  tests need no mocking at all, deliberate contrast with healthpoller.
+
 ## Incidents & lessons so far
- 
+
 Real problems hit and diagnosed along the way:
- 
+
 - **"TLS handshake timeout" on localhost kubectl** -> not a TLS problem.
   Diagnosed via `free -m` / `dmesg` / `top` as memory starvation: k3s control
   plane on a 1GB t3.micro left 29MB available. Symptoms lie about their layer.
@@ -78,11 +93,10 @@ Real problems hit and diagnosed along the way:
 
 ![Actions successful run](docs/gh-actions.png)
 
-
 ## Background
- 
+
 The mental model transfer from OpenStack is the point of this repo:
- 
+
 | OpenStack        | AWS / cloud-native          |
 |------------------|-----------------------------|
 | Neutron network  | VPC                         |
@@ -93,7 +107,7 @@ The mental model transfer from OpenStack is the point of this repo:
 | Glance image     | AMI (per-region!)           |
 | Keystone 403     | IAM deny-by-default         |
 | config-drive / metadata API | IMDSv2           |
- 
+
 ## TODO
 - [ ] Least-privilege IAM policy for the terraform user (lab currently uses AdministratorAccess)
 - [ ] Remote state backend (S3 + DynamoDB locking)
