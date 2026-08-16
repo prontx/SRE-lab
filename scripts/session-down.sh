@@ -2,7 +2,8 @@
 set -euo pipefail
 TF_DIR="$(dirname "$0")/../terraform/aws"
 
-terraform -chdir="$TF_DIR" destroy -auto-approve -var "my_ip=$(curl -4 -s ifconfig.me)/32"
+terraform -chdir="$TF_DIR" destroy -auto-approve -var "my_ip=$(curl -4 -s ifconfig.me)/32" \
+    -var "ssh_public_key=$(cat ~/.ssh/sre-lab.pub)"
 
 echo "==> Verifying nothing is left running:"
 aws ec2 describe-instances --query 'Reservations[].Instances[].{id:InstanceId,state:State.Name}' --output table

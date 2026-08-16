@@ -34,3 +34,21 @@ jobs:
             -summary -strict
             -ignore-missing-schemas
             k8s/clusters/lab/monitoring
+
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        tool: [healthpoller, logmetrics]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: install dependencies
+        run: pip install -r python-tools/${{ matrix.tool }}/requirements.txt
+
+      - name: pytest
+        run: pytest python-tools/${{ matrix.tool }}
