@@ -14,6 +14,19 @@ terraform {
       version = "~> 6.0"
     }
   }
+
+  # Bucket + table created by terraform/bootstrap (see that directory for
+  # the one-time setup). Backend blocks can't reference variables, so
+  # these are literal — matches this repo's existing style of hardcoding
+  # single-operator values (region, CIDRs) rather than parameterizing
+  # things that never vary.
+  backend "s3" {
+    bucket         = "sre-lab-tfstate-prontx"
+    key            = "aws/terraform.tfstate"
+    region         = "eu-central-1"
+    dynamodb_table = "sre-lab-tflock"
+    encrypt        = true
+  }
 }
 
 provider "aws" {
