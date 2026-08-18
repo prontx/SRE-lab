@@ -18,7 +18,20 @@ built from scratch, provisioned as code, and destroyed after each session.
 - k3s single-node Kubernetes bootstrapped at boot via cloud-init `user_data`,
   with the public IP injected into the API cert SANs via IMDSv2 at boot,
   and kubelet pinned to the VPC resolver (see DNS incident below)
-- State hygiene: tfstate excluded from VCS, provider versions pinned via lock file
+- State hygiene: remote state in S3 (versioned, encrypted, public access
+  blocked) with DynamoDB locking, so `terraform apply` from two places at
+  once fails loud instead of corrupting state; tfstate itself excluded from
+  VCS regardless; provider versions pinned via lock file
+
+### `terraform/bootstrap/` — the chicken-and-egg problem ✅
+- Creates the S3 bucket + DynamoDB table that `terraform/aws`'s backend
+  points at. Has to manage its own state locally, since it's what creates
+  the infrastructure that would otherwise hold it — the one Terraform
+  config in this repo that's supposed to stay unmigrated.
+- Run once, by hand, before the first `session-up.sh`: `terraform
+  -chdir=terraform/bootstrap init && apply`. Not wired into automation on
+  purpose — this is infrastructure you set up once and forget, not
+  something to recreate per session.
 
 ### `scripts/` — session automation ✅
 - `session-up.sh`: apply -> wait for SSH -> wait for cloud-init -> pull kubeconfig -> ready
@@ -110,7 +123,7 @@ The mental model transfer from OpenStack is the point of this repo:
 
 ## TODO
 - [ ] Least-privilege IAM policy for the terraform user (lab currently uses AdministratorAccess)
-- [ ] Remote state backend (S3 + DynamoDB locking)
+- [x] Remote state backend (S3 + DynamoDB locking)
 - [ ] flux bootstrap folded into session-up.sh (token via env var)
 - [ ] pre-commit hook mirroring the CI checks locally
 - [ ] Loki + log pipeline

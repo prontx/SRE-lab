@@ -8,19 +8,22 @@ on:
 jobs:
   terraform:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dir: [aws, bootstrap]
     steps:
       - uses: actions/checkout@v4
 
       - uses: hashicorp/setup-terraform@v3
 
       - name: fmt check
-        run: terraform -chdir=terraform/aws fmt -check -diff
+        run: terraform -chdir=terraform/${{ matrix.dir }} fmt -check -diff
 
       - name: init (no backend)
-        run: terraform -chdir=terraform/aws init -backend=false
+        run: terraform -chdir=terraform/${{ matrix.dir }} init -backend=false
 
       - name: validate
-        run: terraform -chdir=terraform/aws validate
+        run: terraform -chdir=terraform/${{ matrix.dir }} validate
 
   kubernetes:
     runs-on: ubuntu-latest

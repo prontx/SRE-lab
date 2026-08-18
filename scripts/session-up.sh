@@ -6,6 +6,10 @@ KEY=~/.ssh/sre-lab
 KUBECONFIG_OUT=~/.kube/sre-lab.yaml
 
 MY_IP="$(curl -4 -s ifconfig.me)/32"
+
+echo "==> Initializing (remote state in S3, locked via DynamoDB)"
+terraform -chdir="$TF_DIR" init
+
 echo "==> Applying (source IP: $MY_IP)"
 terraform -chdir="$TF_DIR" apply -auto-approve -var "my_ip=$MY_IP" \
     -var "ssh_public_key=$(cat ~/.ssh/sre-lab.pub)"
